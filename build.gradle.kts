@@ -14,7 +14,11 @@ repositories {
 dependencies {
     implementation(project(":core"))
 
+    // necessary for logging to work correctly
+    runtimeOnly("org.slf4j:slf4j-simple:1.7.30")
+
     implementation("org.joml:joml:1.10.5")
+    implementation("org.zeromq:jeromq:0.5.2")
 
     val lwjglVersion = "3.3.1"
     val lwjglNatives = "natives-windows"

@@ -6,25 +6,22 @@ import loci.formats.IFormatReader
 import loci.formats.ImageReader
 import loci.formats.meta.IMetadata
 import loci.formats.services.OMEXMLService
+import microscenery.toReadableString
 import ome.units.UNITS
-import ome.units.quantity.Length
-import ome.units.quantity.Time
-import org.joml.Vector4f
+import org.joml.Vector3f
 
 class CZIFileWrapper(val path: String) {
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
 
-    val pixelDimensions: PixelDimensions
-    val physicalDimensions: PhysicalDimensions
+    val metadata: MetaData
     val reader: IFormatReader
 
     init {
-        var series = 1
-
         // create OME-XML metadata store
         val factory = ServiceFactory()
         val service = factory.getInstance(OMEXMLService::class.java)
-        val meta: IMetadata = service.createOMEXMLMetadata()
+        val meta: IMetadata
+        meta = service.createOMEXMLMetadata()
 
         // create format reader
         reader = ImageReader()
@@ -34,63 +31,55 @@ class CZIFileWrapper(val path: String) {
         logger.info("Initializing $path")
         reader.setId(path)
 
-        pixelDimensions = PixelDimensions(reader)
-
-        val seriesCount = reader.seriesCount
-        if (series < seriesCount) reader.series = series
-        series = reader.series
-        println("\tImage series = $series of $seriesCount")
-        physicalDimensions = readPhysicalDimensions(meta, series)
+        this.metadata = MetaData(reader, meta)
+        logger.info(this.metadata.toString())
     }
 
-    data class PixelDimensions(val X: Int, val Y: Int, val Z: Int, val C: Int, val T: Int, val imageCount: Int, val bytesPerPixel: Int) {
-        constructor(reader: IFormatReader) :
-                this(
-                    reader.sizeX,
-                    reader.sizeY,
-                    reader.sizeZ,
-                    reader.sizeC,
-                    reader.sizeT,
-                    reader.imageCount,
-                    (reader.bitsPerPixel+7)/8
-                )
-
-        fun print() {
-            println("Pixel dimensions:")
-            println("\tWidth = $X")
-            println("\tHeight = $Y")
-            println("\tFocal planes = $Z")
-            println("\tChannels = $C")
-            println("\tTimepoints = $T")
-            println("\tTotal planes = $imageCount")
-            println("\tBytes per Pixel = $bytesPerPixel")
+    @Suppress("MemberVisibilityCanBePrivate")
+    data class MetaData(val reader: IFormatReader, val meta: IMetadata, var series: Int = 1) {
+        init {
+            val seriesCount = reader.seriesCount
+            if (series < seriesCount) reader.series = series
+            series = reader.series
         }
-    }
 
-    private fun readPhysicalDimensions(meta: IMetadata, series: Int): PhysicalDimensions {
-        return PhysicalDimensions(
-            meta.getPixelsPhysicalSizeX(series),
-            meta.getPixelsPhysicalSizeY(series),
-            meta.getPixelsPhysicalSizeZ(series),
-            meta.getPixelsTimeIncrement(series)
-        )
-    }
+        val sizeX = reader.sizeX
+        val sizeY = reader.sizeY
+        val sizeZ = reader.sizeZ
+        val sizeC = reader.sizeC
+        val sizeT = reader.sizeT
+        val imageCount = reader.imageCount
+        val bytesPerPixel = (reader.bitsPerPixel + 7) / 8
 
-    data class PhysicalDimensions(val sizeX: Length, val sizeY: Length, val sizeZ: Length, val sizeTimeStep: Time?) {
-        fun toVector(): Vector4f = Vector4f(
-            sizeX.value(UNITS.MICROMETER).toFloat(),
-            sizeY.value(UNITS.MICROMETER).toFloat(),
-            sizeZ.value(UNITS.MICROMETER).toFloat(),
-            sizeTimeStep?.value(UNITS.MILLISECOND)?.toFloat() ?: 0f
+        override fun toString(): String =
+            "Pixel dimensions:\n" +
+            "\tWidth = $sizeX\n" +
+            "\tHeight = $sizeY\n" +
+            "\tFocal planes = $sizeZ\n" +
+            "\tChannels = $sizeC\n" +
+            "\tTimepoints = $sizeT\n" +
+            "\tTime step size = $timeStepSize\n" +
+            "\tTotal planes = $imageCount\n" +
+            "\tBytes per Pixel = $bytesPerPixel\n" +
+            "\tPixel size in um: ${pixelSizeUM.toReadableString()}\n" +
+            "\tFirst plane pos in um: ${firstPlanePosUM.toReadableString()}\n" +
+            "\tLast plane pos in um: ${lastPlanePosUM.toReadableString()}\n"
+
+        val pixelSizeUM: Vector3f = Vector3f(
+            meta.getPixelsPhysicalSizeX(series).value(UNITS.MICROMETER).toFloat(),
+            meta.getPixelsPhysicalSizeY(series).value(UNITS.MICROMETER).toFloat(),
+            meta.getPixelsPhysicalSizeZ(series).value(UNITS.MICROMETER).toFloat(),
         )
 
-        fun print() {
-            println("Physical dimensions:")
-            println("\tX spacing = ${sizeX.value()} ${sizeX.unit().symbol}")
-            println("\tY spacing = ${sizeY.value()} ${sizeY.unit().symbol}")
-            println("\tZ spacing = ${sizeZ.value()} ${sizeZ.unit().symbol}")
-            println("\tTime increment = ${sizeTimeStep?.value(UNITS.SECOND)?.toDouble().toString()} seconds")
-        }
-    }
+        val timeStepSize = meta.getPixelsTimeIncrement(series)?.value(UNITS.MILLISECOND)?.toFloat() ?: 0f
 
+        fun planePositionUM(plane: Int): Vector3f = Vector3f(
+            meta.getPlanePositionX(0, plane).value(UNITS.MICROMETER).toFloat(),
+            meta.getPlanePositionY(0, plane).value(UNITS.MICROMETER).toFloat(),
+            meta.getPlanePositionZ(0, plane).value(UNITS.MICROMETER).toFloat(),
+        )
+
+        val firstPlanePosUM = planePositionUM(0)
+        val lastPlanePosUM = planePositionUM(sizeZ-1)
+    }
 }
