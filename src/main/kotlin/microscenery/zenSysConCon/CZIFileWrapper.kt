@@ -34,18 +34,37 @@ class CZIFileWrapper(val path: String) {
         logger.info("Initializing $path")
         reader.setId(path)
 
-        pixelDimensions = readPixelDimensions(reader)
+        pixelDimensions = PixelDimensions(reader)
 
         val seriesCount = reader.seriesCount
         if (series < seriesCount) reader.series = series
         series = reader.series
         println("\tImage series = $series of $seriesCount")
-        physicalDimensions = readPhysicalDimensions(meta,series)
+        physicalDimensions = readPhysicalDimensions(meta, series)
     }
 
-    /** Outputs dimensional information.  */
-    private fun readPixelDimensions(reader: IFormatReader): PixelDimensions {
-        return PixelDimensions(reader.sizeX, reader.sizeY, reader.sizeZ, reader.sizeC, reader.sizeT, reader.imageCount)
+    data class PixelDimensions(val X: Int, val Y: Int, val Z: Int, val C: Int, val T: Int, val imageCount: Int, val bytesPerPixel: Int) {
+        constructor(reader: IFormatReader) :
+                this(
+                    reader.sizeX,
+                    reader.sizeY,
+                    reader.sizeZ,
+                    reader.sizeC,
+                    reader.sizeT,
+                    reader.imageCount,
+                    (reader.bitsPerPixel+7)/8
+                )
+
+        fun print() {
+            println("Pixel dimensions:")
+            println("\tWidth = $X")
+            println("\tHeight = $Y")
+            println("\tFocal planes = $Z")
+            println("\tChannels = $C")
+            println("\tTimepoints = $T")
+            println("\tTotal planes = $imageCount")
+            println("\tBytes per Pixel = $bytesPerPixel")
+        }
     }
 
     private fun readPhysicalDimensions(meta: IMetadata, series: Int): PhysicalDimensions {
@@ -55,17 +74,6 @@ class CZIFileWrapper(val path: String) {
             meta.getPixelsPhysicalSizeZ(series),
             meta.getPixelsTimeIncrement(series)
         )
-    }
-    data class PixelDimensions(val X: Int, val Y: Int, val Z: Int, val C: Int, val T: Int, val imageCount: Int) {
-        fun print() {
-            println("Pixel dimensions:")
-            println("\tWidth = $X")
-            println("\tHeight = $Y")
-            println("\tFocal planes = $Z")
-            println("\tChannels = $C")
-            println("\tTimepoints = $T")
-            println("\tTotal planes = $imageCount")
-        }
     }
 
     data class PhysicalDimensions(val sizeX: Length, val sizeY: Length, val sizeZ: Length, val sizeTimeStep: Time?) {
