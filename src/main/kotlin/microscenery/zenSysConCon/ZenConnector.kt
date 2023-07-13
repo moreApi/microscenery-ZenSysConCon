@@ -4,12 +4,11 @@ import fromScenery.lazyLogger
 import fromScenery.utils.extensions.plus
 import fromScenery.utils.extensions.times
 import microscenery.hardware.MicroscopeHardwareAgent
-import microscenery.signals.ClientSignal
-import microscenery.signals.NumericType
-import microscenery.signals.ServerState
-import microscenery.signals.Stack
+import microscenery.nowMillis
+import microscenery.signals.*
 import org.joml.Vector2i
 import org.joml.Vector3f
+import org.lwjgl.system.MemoryUtil
 
 class ZenConnector : MicroscopeHardwareAgent(){
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
@@ -34,22 +33,39 @@ class ZenConnector : MicroscopeHardwareAgent(){
         val meta = wrapper.metadata
 
         hardwareDimensions = hardwareDimensions.copy(
-            stageMin = meta.firstPlanePosUM,
-            stageMax = meta.lastPlanePosUM + (Vector3f(meta.sizeX.toFloat(),meta.sizeY.toFloat(),0f)*meta.pixelSizeUM),
+            stageMin = meta.firstPlanePosUM.mul(0.95f),
+            stageMax = meta.lastPlanePosUM.mul(1.05f) + (Vector3f(meta.sizeX.toFloat(),meta.sizeY.toFloat(),0f)*meta.pixelSizeUM),
             imageSize = Vector2i(meta.sizeX,meta.sizeY),
             vertexDiameter = meta.pixelSizeUM.x,
             NumericType.INT16
         )
 
-        val stackSignal = Stack(idCounter++,
+        val stackID = idCounter++
+        val stackSignal = Stack(stackID,
             false,
             meta.firstPlanePosUM,
             meta.lastPlanePosUM,
             meta.sizeZ,
-            System.nanoTime()
+            nowMillis()
         )
 
         output.put(stackSignal)
+
+        for (i in 0 until meta.sizeZ){
+            val data = wrapper.reader.openBytes(i)
+            val buf = MemoryUtil.memAlloc(data.size)
+            buf.put(data)
+            buf.rewind()
+
+            val sliceSignal = Slice(idCounter++,
+                nowMillis(),
+                meta.planePositionUM(i),
+                data.size,
+                stackID to i,
+                buf
+            )
+            output.put(sliceSignal)
+        }
 
     }
 
