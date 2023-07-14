@@ -1,8 +1,7 @@
 package microscenery.zenSysConCon
 
 import fromScenery.lazyLogger
-import fromScenery.utils.extensions.plus
-import fromScenery.utils.extensions.times
+import microscenery.copy
 import microscenery.hardware.MicroscopeHardwareAgent
 import microscenery.nowMillis
 import microscenery.signals.*
@@ -33,8 +32,8 @@ class ZenConnector : MicroscopeHardwareAgent(){
         val meta = wrapper.metadata
 
         hardwareDimensions = hardwareDimensions.copy(
-            stageMin = meta.firstPlanePosUM.mul(0.95f),
-            stageMax = meta.lastPlanePosUM.mul(1.05f) + (Vector3f(meta.sizeX.toFloat(),meta.sizeY.toFloat(),0f)*meta.pixelSizeUM),
+            stageMin = meta.firstPlanePosUM.copy().apply { z *= 0.95f },
+            stageMax = meta.lastPlanePosUM.copy().apply { z *= 1.05f },
             imageSize = Vector2i(meta.sizeX,meta.sizeY),
             vertexDiameter = meta.pixelSizeUM.x,
             NumericType.INT16
