@@ -3,7 +3,7 @@ package microscenery.example
 import loci.common.DebugTools
 import microscenery.network.RemoteMicroscopeServer
 import microscenery.zenSysConCon.CZIFileWrapper
-import microscenery.zenSysConCon.ZenConnector
+import microscenery.zenSysConCon.ZenMicroscope
 import org.zeromq.ZContext
 
 fun main(args: Array<String>) {
@@ -12,8 +12,8 @@ fun main(args: Array<String>) {
 
     DebugTools.setRootLevel("OFF")
     val cziWrap = CZIFileWrapper(id)
-    val zenConnector = ZenConnector()
-    val server = RemoteMicroscopeServer(zenConnector, ZContext())
+    val zenMicroscope = ZenMicroscope()
+    val server = RemoteMicroscopeServer(zenMicroscope, ZContext())
     //zenConnector.stack(cziWrap)
     println("lol")
     //val bar = cziWrap.reader.openBytes(0)
