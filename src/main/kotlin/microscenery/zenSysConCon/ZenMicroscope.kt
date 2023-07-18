@@ -32,8 +32,8 @@ class ZenMicroscope : MicroscopeHardwareAgent(){
         val meta = wrapper.metadata
 
         hardwareDimensions = hardwareDimensions.copy(
-            stageMin = meta.firstPlanePosUM.copy().apply { z *= 0.95f },
-            stageMax = meta.lastPlanePosUM.copy().apply { z *= 1.05f },
+            stageMin = meta.firstPlanePosUM.copy().apply { z *= 0.995f },
+            stageMax = meta.lastPlanePosUM.copy().apply { z *= 1.005f },
             imageSize = Vector2i(meta.sizeX,meta.sizeY),
             vertexDiameter = meta.pixelSizeUM.x,
             NumericType.INT16
