@@ -1,0 +1,29 @@
+<ExperimentFeedback IsActivated="true">
+    <IsSynchronous>true</IsSynchronous>
+    <IsSynchronousToAnalysis>false</IsSynchronousToAnalysis>
+    <IsSynchronousToFile>false</IsSynchronousToFile>
+    <AllowNonExperimentObservablesToTriggerScript>false</AllowNonExperimentObservablesToTriggerScript>
+    <DeadlockTimeout>10</DeadlockTimeout>
+    <PreScript>import System.Threading</PreScript>
+    <LoopScript>#asdfasdf
+        square = 5
+        ring = 8
+
+        if ZenService.Experiment.CurrentZSliceIndex == square:
+        ZenService.HardwareActions.SetTriggerDigitalOut7(True)
+        System.Threading.Thread.Sleep(260)
+        if ZenService.Experiment.CurrentZSliceIndex == square+1:
+        ZenService.HardwareActions.SetTriggerDigitalOut7(False)
+
+        if ZenService.Experiment.CurrentZSliceIndex == ring:
+        ZenService.HardwareActions.SetTriggerDigitalOut7(True)
+        System.Threading.Thread.Sleep(365)
+        if ZenService.Experiment.CurrentZSliceIndex == ring+1:
+        ZenService.HardwareActions.SetTriggerDigitalOut7(False)
+    </LoopScript>
+    <PostScript></PostScript>
+    <IsWarningPopupShown>true</IsWarningPopupShown>
+    <AreDebugMessagesEnabled>false</AreDebugMessagesEnabled>
+    <Actions />
+</ExperimentFeedback>
+  
