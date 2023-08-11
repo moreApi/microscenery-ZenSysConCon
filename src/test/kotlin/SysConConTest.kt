@@ -32,7 +32,7 @@ class SysConConTest {
 //                pipe.sendRequest("sequence manager::SelectSequence", listOf("Sequence1.seq")).printResponse()
 //                pipe.sendRequest("sequence manager::DeleteSequence", listOf("Sequence1.seq")).printResponse()
                 val seqFile = """C:\Users\JanCasus\Desktop\triggeredSquares.seq"""
-//                pipe.sendRequest("sequence manager::ImportSequence", listOf(seqFile,"""rde\dems3""")).printResponse()
+                sysConCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile,"""rde\dems3""")).printResponse()
                 sysConCon.sendRequest("Laser::SetEmission", listOf("dummy_0","dummy_0",1)).printResponse()
                 sysConCon.sendRequest("Laser::SetIntensity", listOf("dummy_0","dummy_0",1f)).printResponse()
 

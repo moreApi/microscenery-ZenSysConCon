@@ -36,7 +36,7 @@ data class TimelineInfo(
     val TimelineIndex: String = "0",
     //val starttime: String = "0",
     val description: String = "",
-    val repeats: String = "2",
+    val repeats: String = "1",
     val intensity: String = "0",
     val LightsourceID: String = "210-2360_0",
     val timelinegroupid: String = "-1",

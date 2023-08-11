@@ -1,19 +1,23 @@
 package microscenery.zenSysConCon
 
 import fromScenery.lazyLogger
+import fromScenery.utils.extensions.xy
+import kotlinx.coroutines.sync.Semaphore
 import microscenery.*
 import microscenery.hardware.MicroscopeHardwareAgent
 import microscenery.signals.*
+import microscenery.zenSysConCon.sysCon.*
 import org.joml.Vector2i
 import org.joml.Vector3f
 import org.lwjgl.system.MemoryUtil
+import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 
-class ZenMicroscope : MicroscopeHardwareAgent() {
+class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnector(),
+                    private val sysCon: SysConNamedPipeConnector = SysConNamedPipeConnector()
+) : MicroscopeHardwareAgent() {
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
-
-    private var zenBlue = ZenBlueTCPConnector()
 
     // for Slices and stacks
     private var idCounter = 0
@@ -26,6 +30,11 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
 
         this.startAgent()
         status = status.copy(ServerState.MANUAL)
+    }
+
+    override fun onClose(){
+        zenBlue.close()
+        sysCon.close()
     }
 
 
@@ -45,7 +54,7 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
     }
 
     override fun snapSlice() {
-        logger.warn("snapSlice Not yet implemented")
+        hardwareCommandsQueue.add(HardwareCommand.CaptureStack)
     }
 
     override fun shutdown() {
@@ -53,7 +62,7 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
     }
 
     override fun acquireStack(meta: ClientSignal.AcquireStack) {
-        logger.warn("acquireStack Not yet implemented")
+        hardwareCommandsQueue.add(HardwareCommand.CaptureStack)
     }
 
     override fun ablatePoints(signal: ClientSignal.AblationPoints) {
@@ -61,11 +70,17 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
     }
 
     override fun startAcquisition() {
-        logger.warn("startAcquisition Not yet implemented")
+        hardwareCommandsQueue.add(HardwareCommand.CaptureStack)
     }
 
     fun debugStack(path: String) {
         hardwareCommandsQueue.add(HardwareCommand.DisplayStack(path))
+    }
+
+    fun debugSync(): Semaphore {
+        val lock = Semaphore(1, 1)
+        hardwareCommandsQueue.add(HardwareCommand.DebugSync(lock))
+        return lock
     }
 
     //############################## end of called from external threads ##############################
@@ -89,24 +104,48 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
                     val czDoc = parseXmlDocument(czexpFile)
                     validate(czDoc)
                     removeExperimentFeedback(czDoc)
-                    val layerThickness = MicroscenerySettings.getVector3("Ablation.PrecisionUM")?.z ?: return // == slice/focus thickness
-                    val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position },layerThickness)
+                    val layerThickness =
+                        MicroscenerySettings.getVector3("Ablation.PrecisionUM")?.z ?: return // == slice/focus thickness
+                    val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
                     val timePerPointUS = 50 // todo really US??
 
-                    val waitLayers = ablationLayers.map{
+                    val indexedAblationLayers = ablationLayers.map {
                         val height = it.key
                         val points = it.value
 
-                        val layerIndex = ((stack.from.z-height) / layerThickness).toInt()
+                        val layerIndex = ((stack.from.z - height) / layerThickness).toInt()
 
-                        layerIndex to points.size * timePerPointUS
+                        layerIndex to points
                     }
-                    addExperimentFeedbackAndSetWaitLayers(czDoc,waitLayers)
+                    addExperimentFeedbackAndSetWaitLayers(czDoc,
+                        indexedAblationLayers.map { it.first to it.second.size * timePerPointUS })
                     val outputPath = "GeneratedTriggered3DAblation.czexp"
-                    writeXmlDocument(czDoc,outputPath)
+                    writeXmlDocument(czDoc, outputPath)
                     zenBlue.importExperimentAndSetAsActive(outputPath)
 
-                    // todo syscon part
+                    val repeats = "1"
+                    val lightSourceId = "dummyLightsource"
+                    val triggerPort = "dummyTriggerPort"
+                    val sysConSequence = Sequence(true,
+                        indexedAblationLayers.flatMap {
+                            listOf<SequenceObject>(
+                                Breakpoint(TimelineInfo(LightsourceID = lightSourceId), triggerPort)
+                            ) +
+                            it.second.map {
+                                PointEntity(
+                                    TimelineInfo(LightsourceID = lightSourceId, repeats = repeats), it.xy()
+                                )
+                            }.toList<SequenceObject>()
+                        }
+                    )
+                    val seqFile = File("GeneratedTriggered3DAblation.seq")
+                    seqFile.writeText(sysConSequence.toString())
+                    sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath,"""generated\GeneratedTriggered3DAblation"""))
+
+                    sysCon.sendRequest("uga-42::UploadSequence")
+
+                    sysCon.sendRequest("uga-42::RunSequence", listOf(1,"auto","rising"))
+                    zenBlue.runExperiment()
 
 
                 } catch (e: IllegalStateException) {
@@ -114,6 +153,9 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
                 } catch (e: CzexpValidationError) {
                     e.printStackTrace()
                 }
+            }
+            is HardwareCommand.DebugSync -> {
+                hwCommand.lock.release()
             }
         }
     }
@@ -165,6 +207,7 @@ class ZenMicroscope : MicroscopeHardwareAgent() {
     private sealed class HardwareCommand {
         class DisplayStack(val filePath: String) : HardwareCommand()
         object CaptureStack : HardwareCommand()
-        class AblatePoints(val points : List<ClientSignal.AblationPoint>) : HardwareCommand()
+        class AblatePoints(val points: List<ClientSignal.AblationPoint>) : HardwareCommand()
+        class DebugSync(val lock: Semaphore) : HardwareCommand()
     }
 }
