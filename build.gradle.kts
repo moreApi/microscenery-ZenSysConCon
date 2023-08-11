@@ -53,7 +53,7 @@ tasks{
 
             register<JavaExec>(name = exampleName) {
                 classpath = sourceSets.test.get().runtimeClasspath
-                main = className
+               // main = className
                 group = "examples.$exampleType"
 
                 val props = System.getProperties().filter { (k, _) -> k.toString().startsWith("scenery.") }
