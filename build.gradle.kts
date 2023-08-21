@@ -17,6 +17,8 @@ dependencies {
     // necessary for logging to work correctly
     runtimeOnly("org.slf4j:slf4j-simple:1.7.30")
 
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+
     implementation("org.joml:joml:1.10.5")
     implementation("org.zeromq:jeromq:0.5.2")
 
@@ -28,6 +30,9 @@ dependencies {
 
     implementation("ome:formats-gpl:6.12.0")
 
+    testImplementation("org.mockito:mockito-core:4.8.0")
+    testImplementation("org.mockito:mockito-inline:4.8.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.0.0")
     testImplementation(kotlin("test"))
 }
 
