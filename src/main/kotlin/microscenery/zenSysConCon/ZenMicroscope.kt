@@ -144,7 +144,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
                     sysCon.sendRequest("uga-42::UploadSequence")
 
-                    sysCon.sendRequest("uga-42::RunSequence", listOf(1,"auto","rising"))
+                    sysCon.sendRequest("uga-42::RunSequence", listOf(1,"auto","rising")) // runs, start condition, flank (ignored)
                     zenBlue.runExperiment()
 
 
