@@ -2,10 +2,9 @@ package microscenery.example
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import microscenery.signals.HardwareDimensions
-import microscenery.signals.MicroscopeStatus
-import microscenery.signals.Slice
-import microscenery.signals.Stack
+import microscenery.MicroscenerySettings
+import microscenery.setVector3
+import microscenery.signals.*
 import microscenery.zenSysConCon.ZenBlueTCPConnector
 import microscenery.zenSysConCon.ZenMicroscope
 import microscenery.zenSysConCon.sysCon.SysConNamedPipeConnector
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
+import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.File
@@ -27,13 +27,15 @@ class ZenMicroscopeTest {
     private var sysCon: SysConNamedPipeConnector = Mockito.mock(SysConNamedPipeConnector::class.java)
     private lateinit var zenMicroscope: ZenMicroscope
 
-    private val experimentFile : File = File("../models/Experiment-19.czi")
+    private val imageFilePath : File = File("../models/Experiment-19.czi")
 
     init {
-        if(!experimentFile.exists()){
+        if(!imageFilePath.exists()){
              throw IllegalStateException("Could not find ../models/Experiment-19.czi. Please download it at https://cloud.viings.de/s/fBMMxdwM47mofSY")
          }
-     }
+        MicroscenerySettings.set("debug",true)
+        MicroscenerySettings.setVector3("Ablation.PrecisionUM", Vector3f(1f))
+    }
 
     @BeforeEach
     fun prepareContext(){
@@ -54,18 +56,62 @@ class ZenMicroscopeTest {
 
     @Test
     fun readDebugStack(){
-        zenMicroscope.debugStack(experimentFile.path)
+        zenMicroscope.debugStack(imageFilePath.path)
         waitForMicroscopeToFinish()
         assertStackHasBeenLoaded()
     }
 
     @Test
     fun getStackFromZenBlue(){
-        whenever(zenBlue.getCurrentDocument()).thenReturn(experimentFile.path)
+        whenever(zenBlue.getCurrentDocument()).thenReturn(imageFilePath.path)
         zenMicroscope.snapSlice()
         waitForMicroscopeToFinish()
         assertStackHasBeenLoaded()
         verify(zenBlue).runExperiment()
+    }
+
+    @Test
+    fun ablationExperimentGeneration(){
+        cleanUpAfterAblationExperimentGeneration() // in-case there were leftovers from previous runs
+        zenMicroscope.debugStack(imageFilePath.path)
+        waitForMicroscopeToFinish()
+        assertStackHasBeenLoaded() //init system and hardware dimensions
+
+        val originalTestExperiment = File("""src/test/resources/OriginalTestExperiment.czexp""")
+        val testExperimentCopy = originalTestExperiment.copyTo(File("TestExperimentCopy.czexp"),true)
+        val experimentPath = testExperimentCopy.absolutePath
+        whenever(zenBlue.saveExperimentAndGetFilePath(any())).thenReturn(experimentPath)
+        zenMicroscope.ablatePoints(ClientSignal.AblationPoints(listOf(
+            ClientSignal.AblationPoint(Vector3f(107f, 78.7f,0f))
+        )))
+        waitForMicroscopeToFinish()
+
+        val expectedCZEXP = File("""src/test/resources/GeneratedTriggered3DAblation.czexp""").readText()
+        val expectedSEQ = File("""src/test/resources/GeneratedTriggered3DAblation.seq""").readText()
+
+        val resultCZEXP = File("""GeneratedTriggered3DAblation.czexp""").readText()
+        val resultSEQ = File("""GeneratedTriggered3DAblation.seq""").readText()
+
+        assertEquals(expectedCZEXP,resultCZEXP)
+        assertEquals(expectedSEQ,resultSEQ)
+
+        verify(zenBlue).importExperimentAndSetAsActive(File("""GeneratedTriggered3DAblation.czexp""").absolutePath)
+        verify(zenBlue).runExperiment()
+        cleanUpAfterAblationExperimentGeneration()
+    }
+
+    private fun cleanUpAfterAblationExperimentGeneration(){
+        listOf("""TestExperimentCopy.czexp""",
+            """TestExperimentCopy.xml""",
+            """GeneratedTriggered3DAblation.czexp""",
+            """GeneratedTriggered3DAblation.seq"""
+        )
+            .map{
+                val f = File(it)
+                if (f.exists()){
+                    f.delete()
+                }
+            }
     }
 
     private fun waitForMicroscopeToFinish(){
