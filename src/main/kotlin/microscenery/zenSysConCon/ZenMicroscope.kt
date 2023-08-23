@@ -99,7 +99,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                 // assumption: distance between layers of image == distance between ablation layers
                 try {
                     val stack = currentStack ?: return
-                    val czexpFile = zenBlue.saveExperimentAndGetFilePath()
+                    val czexpFile = zenBlue.saveExperimentAndGetFilePath().makeXML()
 
                     val czDoc = parseXmlDocument(czexpFile)
                     validate(czDoc)
@@ -149,14 +149,23 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
 
                 } catch (e: IllegalStateException) {
-                    e.printStackTrace()
+                    errorHandlingWithDebug(e)
                 } catch (e: CzexpValidationError) {
-                    e.printStackTrace()
+                    errorHandlingWithDebug(e)
                 }
             }
             is HardwareCommand.DebugSync -> {
                 hwCommand.lock.release()
             }
+        }
+    }
+
+    private fun errorHandlingWithDebug(e: Throwable) {
+        if (MicroscenerySettings.get("debug", false))
+            throw e
+        else {
+            System.err.println("Could not ablate because:")
+            e.printStackTrace()
         }
     }
 
@@ -209,5 +218,16 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         object CaptureStack : HardwareCommand()
         class AblatePoints(val points: List<ClientSignal.AblationPoint>) : HardwareCommand()
         class DebugSync(val lock: Semaphore) : HardwareCommand()
+    }
+
+    private fun String.makeXML(): String {
+        if (this.endsWith(".xml"))
+            return this
+
+        val f = File(this)
+        val fNew = File(f.absolutePath.replaceAfterLast(".","xml"))
+        if (!f.renameTo(fNew))
+            throw IllegalStateException("Could not rename $this to .xml")
+        return fNew.absolutePath
     }
 }
