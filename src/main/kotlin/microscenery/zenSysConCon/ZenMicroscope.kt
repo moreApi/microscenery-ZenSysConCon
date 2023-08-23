@@ -121,11 +121,11 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                         indexedAblationLayers.map { it.first to it.second.size * timePerPointUS })
                     val outputPath = "GeneratedTriggered3DAblation.czexp"
                     writeXmlDocument(czDoc, outputPath)
-                    zenBlue.importExperimentAndSetAsActive(outputPath)
+                    zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
 
-                    val repeats = "1"
-                    val lightSourceId = "dummyLightsource"
-                    val triggerPort = "dummyTriggerPort"
+                    val repeats = MicroscenerySettings.getProperty("Ablation.Repeats",1).toString()
+                    val lightSourceId = MicroscenerySettings.getProperty("Ablation.SysCon.LightSourceId","dummyLightsource")
+                    val triggerPort = MicroscenerySettings.getProperty("Ablation.SysCon.TriggerPort","dummyTriggerPort")
                     val sysConSequence = Sequence(true,
                         indexedAblationLayers.flatMap {
                             listOf<SequenceObject>(
