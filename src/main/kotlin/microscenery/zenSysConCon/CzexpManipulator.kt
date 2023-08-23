@@ -100,7 +100,9 @@ fun removeExperimentFeedback(document: Document){
  * @param waitLayer List<layerIndex to waitTimeMS>
  */
 fun addExperimentFeedbackAndSetWaitLayers(document: Document, waitLayer: List<Pair<Int,Int>>){
-    val experimentFeedback = parseXmlDocument("zenSysConCon/ExperimentFeedback.xml")
+    val experimentFeedbackFilePath = object {}.javaClass.classLoader.getResource("ExperimentFeedback.xml")?.file
+        ?: throw Error("ExperimentFeedback.xml missing")
+    val experimentFeedback = parseXmlDocument(experimentFeedbackFilePath)
 
     val scriptCode = waitLayer.joinToString("\n\n") { (layer, waitTime) ->
         """
@@ -118,9 +120,7 @@ fun addExperimentFeedbackAndSetWaitLayers(document: Document, waitLayer: List<Pa
 }
 
 fun main() {
-//    val xmlFilePath = "input.xml"
-    val xmlFilePath2 = "input2.xml"
-    val xmlFilePath = """C:\Users\JanCasus\Zeiss\20230419_Test3_stack - Copy.czexp"""
+    val xmlFilePath = """C:\Nextcloud\Zeiss\20230419_Test3_stack - Copy.czexp"""
     val outputFilePath = "output.xml"
 
     // Parse the XML document
