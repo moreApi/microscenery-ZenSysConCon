@@ -104,14 +104,14 @@ fun addExperimentFeedbackAndSetWaitLayers(document: Document, waitLayer: List<Pa
         ?: throw Error("ExperimentFeedback.xml missing")
     val experimentFeedback = parseXmlDocument(experimentFeedbackFilePath)
 
-    val scriptCode = waitLayer.joinToString("\n\n") { (layer, waitTime) ->
+    val scriptCode = waitLayer.joinToString("\n") { (layer, waitTime) ->
         """
             if ZenService.Experiment.CurrentZSliceIndex == $layer:
                 ZenService.HardwareActions.SetTriggerDigitalOut7(True)
                 System.Threading.Thread.Sleep($waitTime)
                 ZenService.HardwareActions.SetTriggerDigitalOut7(False)
         """.trimIndent()
-    } + "\n"
+    }
 
     experimentFeedback.getElementsByTagName("LoopScript").item(0).textContent = scriptCode
 
