@@ -18,8 +18,27 @@ class ZenBlueTCPConnector(host: String = "localhost", port: Int = 52757) {
         client.close()
     }
 
-    private fun sendAndListen(commands: String): String? {
-        client.outputStream.write("EVAL $commands".toByteArray())
+    private fun sendAndListenForValue(command: String): String? {
+        internalSend(command)
+        val resp = internalListen()
+        val ok = internalListen()
+        if (ok?.lowercase() != "ok") {
+            throw IllegalStateException("Expected 'OK' but got: '$resp' as answer to:'$command'")
+        }
+        return resp
+    }
+
+    /**
+     * Do not use
+     */
+    private fun internalSend(command: String){
+        client.outputStream.write("EVAL $command".toByteArray())
+    }
+
+    /**
+     * Do not use
+     */
+    private fun internalListen():String?{
         return if (scanner.hasNextLine()) {
             scanner.nextLine()
         } else {
@@ -28,20 +47,25 @@ class ZenBlueTCPConnector(host: String = "localhost", port: Int = 52757) {
     }
 
     private fun sendAndExpectOK(command: String) {
-        val resp = sendAndListen(command)
-        if (resp != "OK") {
-            throw IllegalStateException("Expected 'OK' but got: $resp")
+        internalSend(command)
+        val resp = internalListen()
+        if (resp?.lowercase() != "ok") {
+            throw IllegalStateException("Expected 'OK' but got: '$resp' as answer to:'$command'")
         }
     }
 
-    fun saveExperimentAndGetFilePath(saveAs: String = "GeneratedTriggered3DAblation"): String {
-        sendAndExpectOK("""Zen.Acquisition.Experiments.ActiveExperiment.SaveAs("$saveAs",False)""")
-        return sendAndListen("""Zen.Acquisition.Experiments.ActiveExperiment.FileName""")
-            ?: throw IllegalStateException("Got no filename.")
+    fun saveExperimentAndGetFilePath(): String {
+        if (sendAndListenForValue("""Zen.Acquisition.Experiments.ActiveExperiment.Save()""")?.lowercase() != "true")
+             throw IllegalStateException("Could not save ZenBlue experiment.")
+
+        return sendAndListenForValue("""Zen.Acquisition.Experiments.ActiveExperiment.FileName""")
+            ?: throw IllegalStateException("Got no ZenBlue experiment filename.")
     }
 
     fun runExperiment() {
-        sendAndExpectOK("""Zen.Acquisition.Execute(Zen.Acquisition.Experiments.ActiveExperiment.)""")
+        val resp = sendAndListenForValue("""Zen.Acquisition.Execute(Zen.Acquisition.Experiments.ActiveExperiment)""")
+        if (resp?.trim() != "Zeiss.Micro.Scripting.ZenImage")
+            throw IllegalStateException("Got '$resp' instead of expected result from running experiment.")
     }
 
     fun importExperimentAndSetAsActive(experimentPath: String){
@@ -50,7 +74,7 @@ class ZenBlueTCPConnector(host: String = "localhost", port: Int = 52757) {
     }
 
     fun getCurrentDocument(): String {
-        return sendAndListen("""Zen.Application.ActiveDocument.FileName""")
+        return sendAndListenForValue("""Zen.Application.ActiveDocument.FileName""")
             ?: throw IllegalStateException("Got no filename.")
     }
 }
