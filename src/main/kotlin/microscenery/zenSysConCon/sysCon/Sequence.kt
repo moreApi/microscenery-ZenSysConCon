@@ -14,7 +14,7 @@ data class Sequence(val scanmodeFast:Boolean, val objects: List<SequenceObject>)
             "timelineviewposx=0\n" +
             "timelineviewposy=0\n" +
             "TotalEditorGroups=0\n" +
-            objects.mapIndexed { index, sequenceObject -> sequenceObject.toString(index.toString()) }.joinToString("")
+            objects.reversed().mapIndexed { index, sequenceObject -> sequenceObject.toString(index) }.joinToString("")
 }
 
 abstract class SequenceObject(
@@ -22,11 +22,11 @@ abstract class SequenceObject(
     val TotalTimings: String = "1",
     open val timelineInfo: TimelineInfo
 ) {
-    fun toString(index: String): String = "[$index]\n" +
+    fun toString(index: Int): String = "[$index]\n" +
             "type=$type\n" +
             "TotalTimings=$TotalTimings\n" +
             timelineInfo.toString(index) +
-            objectSpecificString(index) +
+            objectSpecificString(index.toString()) +
             "[/$index]\n"
 
     abstract fun objectSpecificString(index: String): String
@@ -42,8 +42,8 @@ data class TimelineInfo(
     val timelinegroupid: String = "-1",
     val Stepsize: String = "1000"
 ) {
-    fun toString(index: String): String = "TimelineInfo0_TimelineIndex=$TimelineIndex\n" +
-            "TimelineInfo0_starttime=${index}\n" +
+    fun toString(index: Int): String = "TimelineInfo0_TimelineIndex=$TimelineIndex\n" +
+            "TimelineInfo0_starttime=${index*10}\n" +
             "TimelineInfo0_description=$description\n" +
             "TimelineInfo0_repeats=$repeats\n" +
             "TimelineInfo0_intensity=$intensity\n" +
