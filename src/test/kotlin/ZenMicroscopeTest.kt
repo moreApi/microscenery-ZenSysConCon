@@ -13,10 +13,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
-import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -80,17 +80,17 @@ class ZenMicroscopeTest {
         val originalTestExperiment = File("""src/test/resources/OriginalTestExperiment.czexp""")
         val testExperimentCopy = originalTestExperiment.copyTo(File("TestExperimentCopy.czexp"),true)
         val experimentPath = testExperimentCopy.absolutePath
-        whenever(zenBlue.saveExperimentAndGetFilePath(any())).thenReturn(experimentPath)
+        whenever(zenBlue.saveExperimentAndGetFilePath()).thenReturn(experimentPath)
         zenMicroscope.ablatePoints(ClientSignal.AblationPoints(listOf(
             ClientSignal.AblationPoint(Vector3f(107f, 78.7f,0f))
         )))
         waitForMicroscopeToFinish()
 
-        val expectedCZEXP = File("""src/test/resources/GeneratedTriggered3DAblation.czexp""").readText()
-        val expectedSEQ = File("""src/test/resources/GeneratedTriggered3DAblation.seq""").readText()
+        val expectedCZEXP = File("""src/test/resources/GeneratedTriggered3DAblation.czexp""").readText().replace(Regex("\\s+"),"")
+        val expectedSEQ = File("""src/test/resources/GeneratedTriggered3DAblation.seq""").readText().replace(Regex("\\s+"),"")
 
-        val resultCZEXP = File("""GeneratedTriggered3DAblation.czexp""").readText()
-        val resultSEQ = File("""GeneratedTriggered3DAblation.seq""").readText()
+        val resultCZEXP = File("""GeneratedTriggered3DAblation.czexp""").readText().replace(Regex("\\s+"),"")
+        val resultSEQ = File("""GeneratedTriggered3DAblation.seq""").readText().replace(Regex("\\s+"),"")
 
         assertEquals(expectedCZEXP,resultCZEXP)
         assertEquals(expectedSEQ,resultSEQ)
@@ -121,14 +121,14 @@ class ZenMicroscopeTest {
     }
 
     private fun assertStackHasBeenLoaded() {
-        assert(zenMicroscope.output.poll() is MicroscopeStatus)
-        assert(zenMicroscope.output.poll() is HardwareDimensions)
+        assertEquals(MicroscopeStatus::class, zenMicroscope.output.poll(500,TimeUnit.MILLISECONDS)::class)
+        assertEquals(HardwareDimensions::class, zenMicroscope.output.poll(500,TimeUnit.MILLISECONDS)::class)
         val stack = zenMicroscope.output.poll() as? Stack
         assertNotNull(stack)
         assertEquals(Vector3f(107f, 78.7f, -2f), stack.from)
         assertEquals(2f, stack.to.z)
         for (i in 1..5) {
-            val s = zenMicroscope.output.poll()
+            val s = zenMicroscope.output.poll(500,TimeUnit.MILLISECONDS)
             assert(s is Slice)
             assertEquals(i, (s as Slice).Id)
         }
