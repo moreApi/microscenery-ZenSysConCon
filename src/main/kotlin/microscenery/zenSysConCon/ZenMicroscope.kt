@@ -107,13 +107,13 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                     val layerThickness =
                         MicroscenerySettings.getVector3("Ablation.PrecisionUM")?.z ?: return // == slice/focus thickness
                     val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
-                    val timePerPointUS = 50 // todo really US??
+                    val timePerPointUS = 100 // todo really US??
 
                     val indexedAblationLayers = ablationLayers.map {
                         val height = it.key
                         val points = it.value
 
-                        val layerIndex = ((stack.from.z - height) / layerThickness).toInt()
+                        val layerIndex = ((height - stack.from.z) / layerThickness).toInt()
 
                         layerIndex to points
                     }
@@ -164,7 +164,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         if (MicroscenerySettings.get("debug", false))
             throw e
         else {
-            System.err.println("Could not ablate because:")
+            logger.error("Could not ablate because:")
             e.printStackTrace()
         }
     }
