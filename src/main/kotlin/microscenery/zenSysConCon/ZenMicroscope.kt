@@ -6,11 +6,14 @@ import kotlinx.coroutines.sync.Semaphore
 import microscenery.*
 import microscenery.hardware.MicroscopeHardwareAgent
 import microscenery.signals.*
+import microscenery.signals.Stack
 import microscenery.zenSysConCon.sysCon.*
 import org.joml.Vector2i
 import org.joml.Vector3f
 import org.lwjgl.system.MemoryUtil
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -50,7 +53,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     }
 
     override fun stop() {
-        logger.warn("stop Not yet implemented")
+        sysCon.sendRequest("uga-42::StopSequence")
     }
 
     override fun snapSlice() {
@@ -138,11 +141,21 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                             }.toList<SequenceObject>()
                         }
                     )
-                    val seqFile = File("GeneratedTriggered3DAblation.seq")
+                    val seqFile = File("GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}.seq")
                     seqFile.writeText(sysConSequence.toString())
-                    sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath,"""generated\GeneratedTriggered3DAblation"""))
+                    sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath,"""generated"""))
+                    sysCon.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
 
                     sysCon.sendRequest("uga-42::UploadSequence")
+                    var counter = 0
+                    val waitTime = 500
+                    while (!sysCon.sendRequest("uga-42::GetState").first().contains("Idle")){
+                        logger.info("SysCon - UGA is busy. Now waiting for ${counter++*waitTime}ms")
+                        Thread.sleep(waitTime.toLong())
+                        if (counter > 10) {
+                            throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
+                        }
+                    }
 
                     sysCon.sendRequest("uga-42::RunSequence", listOf(1,"auto","rising")) // runs, start condition, flank (ignored)
                     zenBlue.runExperiment()

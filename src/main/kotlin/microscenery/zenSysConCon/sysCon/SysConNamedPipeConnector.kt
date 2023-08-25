@@ -1,6 +1,7 @@
 package microscenery.zenSysConCon.sysCon
 
 import fromScenery.lazyLogger
+import microscenery.lightSleepOnCondition
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 
@@ -23,7 +24,8 @@ class SysConNamedPipeConnector {
         }
         pipe.write(request)
         logger.info("send $command with ${params.size} params")
-        Thread.sleep(500)
+
+        lightSleepOnCondition(5000) { pipe.length() != 0L }
 
         val resp = mutableListOf<String>()
         while (pipe.length() != 0L) {
