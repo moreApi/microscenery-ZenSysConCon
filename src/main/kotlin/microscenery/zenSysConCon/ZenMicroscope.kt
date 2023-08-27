@@ -112,6 +112,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         try {
             val stack = currentStack ?: return
             val czexpFile = zenBlue.saveExperimentAndGetFilePath()
+            //val experimentFolder = File(czexpFile).parent we are not using the correct path to ?abuse? importing
+            // our experiments into ZenBlue as temporary
+            val experimentBaseName = "GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}"
 
             val czDoc = parseXmlDocument(czexpFile)
             validate(czDoc)
@@ -131,7 +134,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             }
             addExperimentFeedbackAndSetWaitLayers(czDoc,
                 indexedAblationLayers.map { it.first to it.second.size * timePerPointUS })
-            val outputPath = "GeneratedTriggered3DAblation.czexp"
+            val outputPath = "$experimentBaseName.czexp"
             writeXmlDocument(czDoc, outputPath)
             zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
 
@@ -150,7 +153,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                             }.toList<SequenceObject>()
                 }
             )
-            val seqFile = File("GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}.seq")
+            val seqFile = File("$experimentBaseName.seq")
             seqFile.writeText(sysConSequence.toString())
             sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath, """generated"""))
             sysCon.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
