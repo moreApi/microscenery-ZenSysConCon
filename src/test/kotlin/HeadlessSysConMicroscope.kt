@@ -4,7 +4,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import microscenery.MicroscenerySettings
 import microscenery.lightSleepOnCondition
-import microscenery.setVector3
+import microscenery.setVector3f
 import microscenery.signals.ClientSignal
 import microscenery.signals.Stack
 import microscenery.zenSysConCon.ZenBlueTCPConnector
@@ -19,7 +19,7 @@ class HeadlessSysConMicroscope {
         @JvmStatic
         fun main(args: Array<String>) {
             MicroscenerySettings.set("debug", true)
-            MicroscenerySettings.setVector3("Ablation.PrecisionUM",Vector3f(1f))
+            MicroscenerySettings.setVector3f("Ablation.PrecisionUM",Vector3f(1f))
             MicroscenerySettings.set("Ablation.SysCon.LightSourceId","dummy_0_0")
             MicroscenerySettings.set("Ablation.SysCon.TriggerPort","UGA-42TTL In 1")
 

@@ -3,7 +3,7 @@ package microscenery.example
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import microscenery.MicroscenerySettings
-import microscenery.setVector3
+import microscenery.setVector3f
 import microscenery.signals.*
 import microscenery.zenSysConCon.ZenBlueTCPConnector
 import microscenery.zenSysConCon.ZenMicroscope
@@ -34,7 +34,7 @@ class ZenMicroscopeTest {
              throw IllegalStateException("Could not find ../models/Experiment-19.czi. Please download it at https://cloud.viings.de/s/fBMMxdwM47mofSY")
          }
         MicroscenerySettings.set("debug",true)
-        MicroscenerySettings.setVector3("Ablation.PrecisionUM", Vector3f(1f))
+        MicroscenerySettings.setVector3f("Ablation.PrecisionUM", Vector3f(1f))
     }
 
     @BeforeEach
