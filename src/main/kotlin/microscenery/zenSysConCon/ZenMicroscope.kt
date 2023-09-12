@@ -29,7 +29,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
 
     init {
-        MicroscenerySettings.setVector3fIfUnset("Ablation.PrecisionUM", Vector3f(100f))
+        MicroscenerySettings.setVector3fIfUnset(Settings.Ablation.Precision, Vector3f(100f))
 
         this.startAgent()
         status = status.copy(ServerState.MANUAL)
