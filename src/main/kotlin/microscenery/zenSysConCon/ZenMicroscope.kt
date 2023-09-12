@@ -18,7 +18,8 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 
 class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnector(),
-                    private val sysCon: SysConNamedPipeConnector = SysConNamedPipeConnector()
+                    private val sysCon: SysConNamedPipeConnector = SysConNamedPipeConnector(),
+                    private val sysConMgr: SysConManager =  SysConManager(sysCon)
 ) : MicroscopeHardwareAgent() {
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
 
@@ -141,33 +142,22 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             val repeats = MicroscenerySettings.getProperty("Ablation.Repeats", 1).toString()
             val lightSourceId = MicroscenerySettings.getProperty("Ablation.SysCon.LightSourceId", "dummyLightsource")
             val triggerPort = MicroscenerySettings.getProperty("Ablation.SysCon.TriggerPort", "dummyTriggerPort")
-            val sysConSequence = Sequence(true,
-                indexedAblationLayers.flatMap {
+            val sysConSequence = Sequence(
+                MicroscenerySettings.get(Settings.Ablation.Rapp.ScanModeFast,true),
+                indexedAblationLayers.flatMap { indexToPoints ->
                     listOf<SequenceObject>(
                         Breakpoint(TimelineInfo(LightsourceID = lightSourceId), triggerPort)
                     ) +
-                            it.second.map {
-                                PointEntity(
-                                    TimelineInfo(LightsourceID = lightSourceId, repeats = repeats), it.xy()
-                                )
-                            }.toList<SequenceObject>()
+                    indexToPoints.second.map {
+                        PointEntity(
+                            TimelineInfo(LightsourceID = lightSourceId, repeats = repeats),
+                            it.xy(), layer = indexToPoints.first
+                        )
+                    }.toList<SequenceObject>()
                 }
             )
-            val seqFile = File("$experimentBaseName.seq")
-            seqFile.writeText(sysConSequence.toString())
-            sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath, """generated"""))
-            sysCon.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
 
-            sysCon.sendRequest("uga-42::UploadSequence")
-            var counter = 0
-            val waitTime = 500
-            while (!sysCon.sendRequest("uga-42::GetState").first().contains("Idle")) {
-                logger.info("SysCon - UGA is busy. Now waiting for ${counter++ * waitTime}ms")
-                Thread.sleep(waitTime.toLong())
-                if (counter > 10) {
-                    throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
-                }
-            }
+            sysConMgr.uploadSequence(experimentBaseName,sysConSequence)
 
             sysCon.sendRequest(
                 "uga-42::RunSequence",

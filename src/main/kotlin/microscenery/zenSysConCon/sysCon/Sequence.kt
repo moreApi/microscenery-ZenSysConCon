@@ -63,13 +63,14 @@ data class Breakpoint(
 
 data class PointEntity(
     override val timelineInfo: TimelineInfo,
-    val position: Vector2f
+    val position: Vector2f,
+    val layer: Int = 0
 ) : SequenceObject( "Entity", timelineInfo = timelineInfo) {
     override fun objectSpecificString(index: String): String = "Entity${index}_Type=0\n" +
             "Entity${index}_Filled=False\n" +
             "Entity${index}_CenterX=${position.x}\n" +
             "Entity${index}_CenterY=${position.y}\n" +
-            "Entity${index}_CenterZ=0\n" +
+            "Entity${index}_CenterZ=$layer\n" +
             "Entity${index}_Rotation=0\n" +
             "Entity${index}_ScaleX=1\n" +
             "Entity${index}_ScaleY=1\n" +
