@@ -2,6 +2,7 @@ package microscenery.example
 
 import fromScenery.SettingsEditor
 import microscenery.MicroscenerySettings
+import microscenery.Settings
 import microscenery.network.RemoteMicroscopeServer
 import microscenery.zenSysConCon.ZenMicroscope
 import microscenery.zenSysConCon.sysCon.SysConNamedPipeConnector
@@ -13,7 +14,7 @@ class ZenMicroscopeServer {
         @JvmStatic
         fun main(args: Array<String>) {
             SettingsEditor(MicroscenerySettings)
-            val syscon = if (MicroscenerySettings.get("ZenMicroscope.mockSysCon",false)){
+            val syscon = if (MicroscenerySettings.get(Settings.ZenMicroscope.MockSysCon,false)){
                 Mockito.mock(SysConNamedPipeConnector::class.java)
             } else {
                 SysConNamedPipeConnector()
