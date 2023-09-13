@@ -29,7 +29,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
 
     init {
-        MicroscenerySettings.setVector3fIfUnset(Settings.Ablation.Precision, Vector3f(100f))
+        MicroscenerySettings.setVector3fIfUnset(Settings.Ablation.PrecisionUM, Vector3f(1f))
 
         this.startAgent()
         status = status.copy(ServerState.MANUAL)
@@ -120,9 +120,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             validate(czDoc)
             removeExperimentFeedback(czDoc)
             val layerThickness =
-                MicroscenerySettings.getVector3("Ablation.PrecisionUM")?.z ?: return // == slice/focus thickness
+                MicroscenerySettings.getVector3(Settings.Ablation.PrecisionUM)?.z ?: return // == slice/focus thickness
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
-            val timePerPointUS = 100 // todo really US??
+            val timePerPointMS = MicroscenerySettings.getProperty(Settings.Ablation.DwellTimeMillis,6)  // todo really US??
 
             val indexedAblationLayers = ablationLayers.map {
                 val height = it.key
@@ -133,7 +133,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                 layerIndex to points
             }
             addExperimentFeedbackAndSetWaitLayers(czDoc,
-                indexedAblationLayers.map { it.first to it.second.size * timePerPointUS })
+                indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS).toInt() })
             val outputPath = "$experimentBaseName.czexp"
             writeXmlDocument(czDoc, outputPath)
             zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
