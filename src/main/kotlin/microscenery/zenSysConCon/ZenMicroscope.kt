@@ -23,7 +23,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
 
     // for Slices and stacks
-    private var idCounter = 0
+    private var idCounter = 1
     private var currentStack: Stack? = null
 
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
@@ -175,6 +175,8 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             ) // runs, start condition, flank (ignored)
             zenBlue.runExperiment()
 
+            val file = zenBlue.getCurrentDocument()
+            hardwareCommandsQueue.add(HardwareCommand.DisplayStack(file))
 
         } catch (e: IllegalStateException) {
             errorHandlingWithDebug(e)
@@ -204,7 +206,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             NumericType.INT16
         )
 
-        val stackID = idCounter++
+        val stackID = 0 // TODO this is dangerous
         val stackSignal = Stack(
             stackID,
             false,
