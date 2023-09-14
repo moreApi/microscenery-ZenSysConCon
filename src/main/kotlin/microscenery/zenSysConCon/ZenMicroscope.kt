@@ -116,9 +116,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             // our experiments into ZenBlue as temporary
             val experimentBaseName = "GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}"
 
-            val czDoc = parseXmlDocument(czexpFile)
-            validate(czDoc)
-            removeExperimentFeedback(czDoc)
+            val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
+            CzexpManipulator.validate(czDoc)
+            CzexpManipulator.removeExperimentFeedback(czDoc)
             val layerThickness =
                 MicroscenerySettings.getVector3(Settings.Ablation.PrecisionUM)?.z ?: return // == slice/focus thickness
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
@@ -132,57 +132,66 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
                 layerIndex to points
             }
-            addExperimentFeedbackAndSetWaitLayers(czDoc,
+            CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(czDoc,
                 indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS).toInt() })
             val outputPath = "$experimentBaseName.czexp"
-            writeXmlDocument(czDoc, outputPath)
+            CzexpManipulator.writeXmlDocument(czDoc, outputPath)
             zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
 
-            val repeats = MicroscenerySettings.getProperty("Ablation.Repeats", 1).toString()
-            val lightSourceId = MicroscenerySettings.getProperty("Ablation.SysCon.LightSourceId", "dummyLightsource")
-            val triggerPort = MicroscenerySettings.getProperty("Ablation.SysCon.TriggerPort", "dummyTriggerPort")
-            val sysConSequence = Sequence(true,
-                indexedAblationLayers.flatMap {
-                    listOf<SequenceObject>(
-                        Breakpoint(TimelineInfo(LightsourceID = lightSourceId), triggerPort)
-                    ) +
-                            it.second.map {
-                                PointEntity(
-                                    TimelineInfo(LightsourceID = lightSourceId, repeats = repeats), it.xy()
-                                )
-                            }.toList<SequenceObject>()
-                }
-            )
-            val seqFile = File("$experimentBaseName.seq")
-            seqFile.writeText(sysConSequence.toString())
-            sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath, """generated"""))
-            sysCon.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
+            buildAndStartSysConSequence(indexedAblationLayers, experimentBaseName)
 
-            sysCon.sendRequest("uga-42::UploadSequence")
-            var counter = 0
-            val waitTime = 500
-            while (!sysCon.sendRequest("uga-42::GetState").first().contains("Idle")) {
-                logger.info("SysCon - UGA is busy. Now waiting for ${counter++ * waitTime}ms")
-                Thread.sleep(waitTime.toLong())
-                if (counter > 10) {
-                    throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
-                }
-            }
-
-            sysCon.sendRequest(
-                "uga-42::RunSequence",
-                listOf(1, "auto", "rising")
-            ) // runs, start condition, flank (ignored)
             zenBlue.runExperiment()
 
+            // display result
             val file = zenBlue.getCurrentDocument()
             hardwareCommandsQueue.add(HardwareCommand.DisplayStack(file))
 
         } catch (e: IllegalStateException) {
             errorHandlingWithDebug(e)
-        } catch (e: CzexpValidationError) {
+        } catch (e: CzexpManipulator.CzexpValidationError) {
             errorHandlingWithDebug(e)
         }
+    }
+
+    private fun buildAndStartSysConSequence(
+        indexedAblationLayers: List<Pair<Int, List<Vector3f>>>,
+        experimentBaseName: String
+    ) {
+        val repeats = MicroscenerySettings.getProperty("Ablation.Repeats", 1).toString()
+        val lightSourceId = MicroscenerySettings.getProperty("Ablation.SysCon.LightSourceId", "dummyLightsource")
+        val triggerPort = MicroscenerySettings.getProperty("Ablation.SysCon.TriggerPort", "dummyTriggerPort")
+        val sysConSequence = Sequence(true,
+            indexedAblationLayers.flatMap {
+                listOf<SequenceObject>(
+                    Breakpoint(TimelineInfo(LightsourceID = lightSourceId), triggerPort)
+                ) +
+                        it.second.map { pos ->
+                            PointEntity(
+                                TimelineInfo(LightsourceID = lightSourceId, repeats = repeats), pos.xy()
+                            )
+                        }.toList<SequenceObject>()
+            }
+        )
+        val seqFile = File("$experimentBaseName.seq")
+        seqFile.writeText(sysConSequence.toString())
+        sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath, """generated"""))
+        sysCon.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
+
+        sysCon.sendRequest("uga-42::UploadSequence")
+        var counter = 0
+        val waitTime = 500
+        while (!sysCon.sendRequest("uga-42::GetState").first().contains("Idle")) {
+            logger.info("SysCon - UGA is busy. Now waiting for ${counter++ * waitTime}ms")
+            Thread.sleep(waitTime.toLong())
+            if (counter > 10) {
+                throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
+            }
+        }
+
+        sysCon.sendRequest(
+            "uga-42::RunSequence",
+            listOf(1, "auto", "rising")
+        ) // runs, start condition, flank (ignored)
     }
 
     private fun errorHandlingWithDebug(e: Throwable) {
