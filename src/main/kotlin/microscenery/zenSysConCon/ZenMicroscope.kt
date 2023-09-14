@@ -169,7 +169,8 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         val repeats = MicroscenerySettings.getProperty(Settings.Ablation.Repetitions, 1).toString()
         val lightSourceId = MicroscenerySettings.getProperty(Settings.Ablation.SysCon.LightSourceId, "dummyLightsource")
         val triggerPort = MicroscenerySettings.getProperty(Settings.Ablation.SysCon.TriggerPort, "dummyTriggerPort")
-        val sysConSequence = Sequence(false,
+        val sysConSequence = Sequence(
+            MicroscenerySettings.getProperty(Settings.Ablation.SysCon.ScanModeFast,false),
             indexedAblationLayers.flatMap {
                 listOf<SequenceObject>(
                     Breakpoint(TimelineInfo(LightsourceID = lightSourceId), triggerPort)

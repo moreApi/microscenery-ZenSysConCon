@@ -11,12 +11,14 @@ class SysConNamedPipeConnector {
 
 
     fun sendRequest(command: String, params: List<Any> = emptyList()): List<String> {
+        logger.info("Sending command: $command Params: ${params.joinToString()}")
         var request = command.toCommand()
         params.forEach {
             request += when (it){
                 is String -> it.toParam()
                 is Int -> it.toParam()
                 is Float -> it.toParam()
+                is Boolean -> it.toParam()
                 else -> {
                     throw IllegalArgumentException("Unknown type for byte conversion ${it.javaClass.name}")
                 }
@@ -41,7 +43,7 @@ class SysConNamedPipeConnector {
 
     companion object{
 
-        // Transforms a native string to an SCI-string
+        // Transforms a native string to an ASCI-string
         private fun String.toCommand(): ByteArray {
             val a = this.map { it.code.toByte()}
                 .plus(13).plus(10)// end line chars
@@ -63,6 +65,10 @@ class SysConNamedPipeConnector {
 
         private fun String.toParam(): ByteArray{
             return length.toParam().plus(this.map { it.code.toByte() })
+        }
+
+        private fun Boolean.toParam(): ByteArray{
+            return ByteArray(1){if (this) 1.toByte() else 0.toByte()}
         }
 
     }
