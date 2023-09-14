@@ -7,7 +7,7 @@ import microscenery.setVector3f
 import microscenery.signals.*
 import microscenery.zenSysConCon.ZenBlueTCPConnector
 import microscenery.zenSysConCon.ZenMicroscope
-import microscenery.zenSysConCon.sysCon.SysConNamedPipeConnector
+import microscenery.zenSysConCon.sysCon.SysConConnection
 import org.joml.Vector3f
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -24,7 +24,7 @@ import kotlin.test.assertNotNull
 class ZenMicroscopeTest {
 
     private var zenBlue: ZenBlueTCPConnector = Mockito.mock(ZenBlueTCPConnector::class.java)
-    private var sysCon: SysConNamedPipeConnector = Mockito.mock(SysConNamedPipeConnector::class.java)
+    private var sysCon: SysConConnection = Mockito.mock(SysConConnection::class.java)
     private lateinit var zenMicroscope: ZenMicroscope
 
     private val imageFilePath : File = File("../models/Experiment-19.czi")
@@ -40,7 +40,7 @@ class ZenMicroscopeTest {
     @BeforeEach
     fun prepareContext(){
         zenBlue = Mockito.mock(ZenBlueTCPConnector::class.java)
-        sysCon = Mockito.mock(SysConNamedPipeConnector::class.java)
+        sysCon = Mockito.mock(SysConConnection::class.java)
         zenMicroscope = ZenMicroscope(zenBlue,sysCon)
     }
 

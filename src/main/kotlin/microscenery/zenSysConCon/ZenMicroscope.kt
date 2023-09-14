@@ -18,7 +18,7 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 
 class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnector(),
-                    private val sysCon: SysConNamedPipeConnector = SysConNamedPipeConnector()
+                    private val sysCon: SysConConnection = SysConConnection()
 ) : MicroscopeHardwareAgent() {
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
 
@@ -53,7 +53,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     }
 
     override fun stop() {
-        sysCon.sendRequest("uga-42::StopSequence")
+        sysCon.stop()
     }
 
     override fun snapSlice() {
@@ -111,16 +111,12 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private fun handleAblatePointsCommand(hwCommand: HardwareCommand.AblatePoints) {
         try {
             val stack = currentStack ?: return
-            val czexpFile = zenBlue.saveExperimentAndGetFilePath()
-            //val experimentFolder = File(czexpFile).parent we are not using the correct path to ?abuse? importing
-            // our experiments into ZenBlue as temporary
             val experimentBaseName = "GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}"
 
             val layerThickness = (stack.to.z - stack.from.z) / stack.slicesCount
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
             // todo current value is fixed to accurate scan mode points
             val timePerPointMS = MicroscenerySettings.getProperty(Settings.Ablation.DwellTimeMillis,6) + (MicroscenerySettings.getProperty(Settings.Ablation.Repetitions, 1) -1)
-
 
             val indexedAblationLayers = ablationLayers.map {
                 val height = it.key
@@ -131,16 +127,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                 layerIndex to points
             }
 
-
-            val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
-            CzexpManipulator.validate(czDoc)
-            CzexpManipulator.removeExperimentFeedback(czDoc)
-            CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(czDoc,
-                indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS) })
-            val outputPath = "$experimentBaseName.czexp"
-            CzexpManipulator.writeXmlDocument(czDoc, outputPath)
-            zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
-
+            buildAndUploadCzExp(indexedAblationLayers, timePerPointMS, experimentBaseName)
             buildAndStartSysConSequence(indexedAblationLayers, experimentBaseName)
 
             zenBlue.runExperiment()
@@ -154,6 +141,25 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         } catch (e: CzexpManipulator.CzexpValidationError) {
             errorHandlingWithDebug(e)
         }
+    }
+
+    private fun buildAndUploadCzExp(
+        indexedAblationLayers: List<Pair<Int, List<Vector3f>>>,
+        timePerPointMS: Int,
+        experimentBaseName: String
+    ) {
+        val czexpFile = zenBlue.saveExperimentAndGetFilePath()
+        //val experimentFolder = File(czexpFile).parent
+        // we are not using the correct path to ?abuse? importing
+        // our experiments into ZenBlue as temporary
+        val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
+        CzexpManipulator.validate(czDoc)
+        CzexpManipulator.removeExperimentFeedback(czDoc)
+        CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(czDoc,
+            indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS) })
+        val outputPath = "$experimentBaseName.czexp"
+        CzexpManipulator.writeXmlDocument(czDoc, outputPath)
+        zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
     }
 
     private fun buildAndStartSysConSequence(
@@ -175,26 +181,10 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                         }.toList<SequenceObject>()
             }
         )
-        val seqFile = File("$experimentBaseName.seq")
-        seqFile.writeText(sysConSequence.toString())
-        sysCon.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath, """generated"""))
-        sysCon.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
 
-        sysCon.sendRequest("uga-42::UploadSequence")
-        var counter = 0
-        val waitTime = 500
-        while (!sysCon.sendRequest("uga-42::GetState").first().contains("Idle")) {
-            logger.info("SysCon - UGA is busy. Now waiting for ${counter++ * waitTime}ms")
-            Thread.sleep(waitTime.toLong())
-            if (counter > 10) {
-                throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
-            }
-        }
+        sysCon.uploadSequence(experimentBaseName,sysConSequence)
 
-        sysCon.sendRequest(
-            "uga-42::RunSequence",
-            listOf(1, "auto", "rising")
-        ) // runs, start condition, flank (ignored)
+        sysCon.startSequence()
     }
 
     private fun errorHandlingWithDebug(e: Throwable) {
