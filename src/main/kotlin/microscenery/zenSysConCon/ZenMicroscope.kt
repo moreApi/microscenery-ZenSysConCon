@@ -116,13 +116,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             // our experiments into ZenBlue as temporary
             val experimentBaseName = "GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}"
 
-            val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
-            CzexpManipulator.validate(czDoc)
-            CzexpManipulator.removeExperimentFeedback(czDoc)
-            val layerThickness =
-                MicroscenerySettings.getVector3(Settings.Ablation.PrecisionUM)?.z ?: return // == slice/focus thickness
+            val layerThickness = (stack.to.z - stack.from.z) / stack.slicesCount
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
-            val timePerPointMS = MicroscenerySettings.getProperty(Settings.Ablation.DwellTimeMillis,6)  // todo really US??
+            val timePerPointMS = MicroscenerySettings.getProperty(Settings.Ablation.DwellTimeMillis,6)  // todo current value is fixed to accurate scan mode points
 
             val indexedAblationLayers = ablationLayers.map {
                 val height = it.key
@@ -132,8 +128,13 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
                 layerIndex to points
             }
+
+
+            val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
+            CzexpManipulator.validate(czDoc)
+            CzexpManipulator.removeExperimentFeedback(czDoc)
             CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(czDoc,
-                indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS).toInt() })
+                indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS) })
             val outputPath = "$experimentBaseName.czexp"
             CzexpManipulator.writeXmlDocument(czDoc, outputPath)
             zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
