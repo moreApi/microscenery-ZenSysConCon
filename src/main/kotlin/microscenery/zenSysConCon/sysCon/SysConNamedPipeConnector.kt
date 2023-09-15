@@ -25,7 +25,6 @@ class SysConNamedPipeConnector {
             }
         }
         pipe.write(request)
-        logger.info("send $command with ${params.size} params")
 
         lightSleepOnCondition(5000) { pipe.length() != 0L }
 
