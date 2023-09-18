@@ -22,8 +22,8 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 ) : MicroscopeHardwareAgent() {
     private val logger by lazyLogger(System.getProperty("scenery.LogLevel", "info"))
 
-    // for Slices and stacks
-    private var idCounter = 1
+    private var sliceIdCounter = 0
+    private var stackIdCounter = 0
     private var currentStack: Stack? = null
 
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
@@ -201,15 +201,22 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
         val meta = wrapper.metadata
 
-        hardwareDimensions = hardwareDimensions.copy(
-            stageMin = meta.firstPlanePosUM.copy().apply { z *= 0.995f },
-            stageMax = meta.lastPlanePosUM.copy().apply { z *= 1.005f },
-            imageSize = Vector2i(meta.sizeX, meta.sizeY),
-            vertexDiameter = meta.pixelSizeUM.x,
-            NumericType.INT16
-        )
+        val hwDmMin = meta.firstPlanePosUM.copy().apply { z *= 0.9995f }
+        val hwDmMax = meta.lastPlanePosUM.copy().apply { z *= 1.0005f }
 
-        val stackID = 0 // TODO this is dangerous
+        if (hwDmMin != hardwareDimensions.stageMin || hwDmMax != hardwareDimensions.stageMax){
+            // we got a new stack
+            stackIdCounter++
+            hardwareDimensions = hardwareDimensions.copy(
+                stageMin = hwDmMin,
+                stageMax = hwDmMax,
+                imageSize = Vector2i(meta.sizeX, meta.sizeY),
+                vertexDiameter = meta.pixelSizeUM.x,
+                NumericType.INT16
+            )
+        }
+
+        val stackID = stackIdCounter
         val stackSignal = Stack(
             stackID,
             false,
@@ -229,7 +236,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             buf.rewind()
 
             val sliceSignal = Slice(
-                idCounter++,
+                sliceIdCounter++,
                 nowMillis(),
                 meta.planePositionUM(i),
                 data.size,
