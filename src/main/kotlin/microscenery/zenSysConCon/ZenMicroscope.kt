@@ -16,6 +16,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnector(),
                     private val sysCon: SysConConnection = SysConConnection()
@@ -115,8 +117,8 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
             val layerThickness = (stack.to.z - stack.from.z) / stack.slicesCount
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
-            // todo current value is fixed to accurate scan mode points
-            val timePerPointMS = MicroscenerySettings.getProperty(Settings.Ablation.DwellTimeMillis,6) + (MicroscenerySettings.getProperty(Settings.Ablation.Repetitions, 1) -1)
+            // todo current value is fixed to accurate scan mode points ( 5ms galvo movement + 0.05 per "repetition"
+            val timePerPointMS = 5 + (hwCommand.points.first().dwellTime / 1000f).roundToInt()
 
             val indexedAblationLayers = ablationLayers.map {
                 val height = it.key
@@ -128,7 +130,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             }
 
             buildAndUploadCzExp(indexedAblationLayers, timePerPointMS, experimentBaseName)
-            buildAndStartSysConSequence(indexedAblationLayers, experimentBaseName)
+            buildAndStartSysConSequence(indexedAblationLayers, experimentBaseName,hwCommand.points.first().dwellTime)
 
             zenBlue.runExperiment()
 
@@ -164,9 +166,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
     private fun buildAndStartSysConSequence(
         indexedAblationLayers: List<Pair<Int, List<Vector3f>>>,
-        experimentBaseName: String
+        experimentBaseName: String,
+        dwellTimeUS: Long
     ) {
-        val repeats = MicroscenerySettings.getProperty(Settings.Ablation.Repetitions, 1).toString()
         val lightSourceId = MicroscenerySettings.getProperty(Settings.Ablation.SysCon.LightSourceId, "dummyLightsource")
         val triggerPort = MicroscenerySettings.getProperty(Settings.Ablation.SysCon.TriggerPort, "dummyTriggerPort")
         val sysConSequence = Sequence(
@@ -177,7 +179,8 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                 ) +
                         it.second.map { pos ->
                             PointEntity(
-                                TimelineInfo(LightsourceID = lightSourceId, repeats = repeats), pos.xy()
+                                // 50 us per repeat
+                                TimelineInfo(LightsourceID = lightSourceId, repeats = ceil(dwellTimeUS/50f).toInt().toString()), pos.xy()
                             )
                         }.toList<SequenceObject>()
             }
