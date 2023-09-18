@@ -27,21 +27,27 @@ class SysConConnection(private val pipe: SysConNamedPipeConnector = SysConNamedP
     }
 
     fun uploadSequence(experimentBaseName: String, sysConSequence: Sequence){
+        fun waitForSyscon(){
+            var counter = 0
+            val waitTime = 500
+            while (!pipe.sendRequest("uga-42::GetState").first().contains("Idle")) {
+                logger.info("SysCon - UGA is busy. Now waiting for ${counter++ * waitTime}ms")
+                Thread.sleep(waitTime.toLong())
+                if (counter > 10) {
+                    throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
+                }
+            }
+        }
+
         val seqFile = File("$experimentBaseName.seq")
         seqFile.writeText(sysConSequence.toString())
+        
         pipe.sendRequest("sequence manager::ImportSequence", listOf(seqFile.absolutePath, """generated"""))
+        waitForSyscon()
         pipe.sendRequest("sequence manager::SelectSequence", listOf("""generated\${seqFile.name}"""))
 
         pipe.sendRequest("uga-42::UploadSequence")
-        var counter = 0
-        val waitTime = 500
-        while (!pipe.sendRequest("uga-42::GetState").first().contains("Idle")) {
-            logger.info("SysCon - UGA is busy. Now waiting for ${counter++ * waitTime}ms")
-            Thread.sleep(waitTime.toLong())
-            if (counter > 10) {
-                throw IllegalStateException("SysCon - UGA seems blocked. Aborting.")
-            }
-        }
+        waitForSyscon()
     }
 
     fun setShutter(open: Boolean){
