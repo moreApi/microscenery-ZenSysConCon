@@ -1,6 +1,8 @@
 package microscenery.zenSysConCon
 
 import fromScenery.lazyLogger
+import fromScenery.utils.extensions.minus
+import fromScenery.utils.extensions.plus
 import fromScenery.utils.extensions.xy
 import kotlinx.coroutines.sync.Semaphore
 import microscenery.*
@@ -177,9 +179,12 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                     Breakpoint(TimelineInfo(LightsourceID = lightSourceId), triggerPort)
                 ) +
                         it.second.map { pos ->
+                            val stack = currentStack ?: return
+                            val imagePos = pos - ((stack.from.copy() + stack.to).mul(0.5f))
+
                             PointEntity(
                                 // 50 us per repeat
-                                TimelineInfo(LightsourceID = lightSourceId, repeats = dwellTimeUS.toString()), pos.xy()
+                                TimelineInfo(LightsourceID = lightSourceId, repeats = dwellTimeUS.toString()), imagePos.xy()
                             )
                         }.toList<SequenceObject>()
             }
