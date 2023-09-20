@@ -180,7 +180,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                 ) +
                         it.second.map { pos ->
                             val stack = currentStack ?: return
-                            val imagePos = pos - ((stack.from.copy() + stack.to).mul(0.5f))
+                            val imagePos = (pos - ((stack.from.copy() + stack.to).mul(0.5f))) / hardwareDimensions.vertexDiameter
+                            imagePos.x += hardwareDimensions.imageSize.x /2
+                            imagePos.y += hardwareDimensions.imageSize.y /2
 
                             PointEntity(
                                 // 50 us per repeat
