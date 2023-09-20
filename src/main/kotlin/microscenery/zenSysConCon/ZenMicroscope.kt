@@ -16,8 +16,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnector(),
                     private val sysCon: SysConConnection = SysConConnection()
@@ -118,7 +116,8 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             val layerThickness = (stack.to.z - stack.from.z) / stack.slicesCount
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
             // todo current value is fixed to accurate scan mode points ( 5ms galvo movement + 0.05 per "repetition"
-            val timePerPointMS = 5 + (hwCommand.points.first().dwellTime / 1000f).roundToInt()
+            //todo: uncomment this val timePerPointMS = 5 + (hwCommand.points.first().dwellTime / 1000f).roundToInt()
+            val timePerPointMS = 5 + hwCommand.points.first().dwellTime.toInt()
 
             val indexedAblationLayers = ablationLayers.map {
                 val height = it.key
@@ -180,7 +179,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                         it.second.map { pos ->
                             PointEntity(
                                 // 50 us per repeat
-                                TimelineInfo(LightsourceID = lightSourceId, repeats = ceil(dwellTimeUS/50f).toInt().toString()), pos.xy()
+                                TimelineInfo(LightsourceID = lightSourceId, repeats = dwellTimeUS.toString()), pos.xy()
                             )
                         }.toList<SequenceObject>()
             }
