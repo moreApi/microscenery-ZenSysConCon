@@ -13,7 +13,6 @@ import microscenery.zenSysConCon.sysCon.*
 import org.joml.Vector2i
 import org.joml.Vector3f
 import org.lwjgl.system.MemoryUtil
-import org.w3c.dom.Document
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -32,10 +31,10 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
 
     private val experimentBaseNameBase = "Generated"
-    private var exposure = 0f
 
     init {
         MicroscenerySettings.setVector3fIfUnset(Settings.Ablation.PrecisionUM, Vector3f(1f))
+        MicroscenerySettings.setIfUnset(Settings.ZenMicroscope.exposureTime, 250f)
 
         this.startAgent()
         status = status.copy(ServerState.MANUAL)
@@ -159,7 +158,6 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         // we are not using the correct path to ?abuse? importing
         // our experiments into ZenBlue as temporary
         val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
-        extractExposure(czexpFile,czDoc)
         CzexpManipulator.validate(czDoc)
         if (!CzexpManipulator.setAllExposure(czDoc,1f)) logger.warn("Could not set exposure to 1 for ablation.")
         CzexpManipulator.removeExperimentFeedback(czDoc)
@@ -178,22 +176,12 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         // we are not using the correct path to ?abuse? importing
         // our experiments into ZenBlue as temporary
         val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
-        extractExposure(czexpFile,czDoc)
-        if (exposure == 0f) {
-            logger.error("Exposure is 0. This means exposure could not be extracted." )
-        } else {
-            CzexpManipulator.setAllExposure(czDoc, exposure)
-        }
+        CzexpManipulator.setAllExposure(czDoc, MicroscenerySettings.get(Settings.ZenMicroscope.exposureTime,250f))
         CzexpManipulator.validate(czDoc)
         CzexpManipulator.removeExperimentFeedback(czDoc)
         val outputPath = "$experimentBaseName.czexp"
         CzexpManipulator.writeXmlDocument(czDoc, outputPath)
         zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
-    }
-
-    private fun extractExposure(czexpFile: String, parsedXML: Document){
-        if (czexpFile.startsWith(experimentBaseNameBase)) return
-        CzexpManipulator.getExposure(parsedXML)?.let { exposure = it }
     }
 
     private fun buildAndStartSysConSequence(
