@@ -71,9 +71,13 @@ object CzexpManipulator {
         while (formattedFloat.endsWith("0")) formattedFloat = formattedFloat.removeSuffix("0")
         formattedFloat = formattedFloat.removeSuffix(".")
 
-        document.getElementsByTagName("ExposureTime").asList()
+        document.getElementsByTagName("CameraFrameSetup").asList()
             .forEach {
-                it.textContent = formattedFloat
+                it.getChild("ExposureTime")?.textContent = formattedFloat
+            }
+        document.getElementsByTagName("Detector").asList()
+            .forEach {
+                it.getChild("ExposureTime")?.textContent = formattedFloat
             }
         return true
     }
@@ -166,7 +170,7 @@ fun main() {
 //    val insertBook = parseXmlDocument(xmlFilePath2)
     val exposure = CzexpManipulator.getExposure(document)
     println(exposure)
-    CzexpManipulator.setAllExposure(document,1f)
+    CzexpManipulator.setAllExposure(document,13.37f)
     // Modify the XML document
 //    modifyXmlDocument2(document,insertBook.firstChild)
 
