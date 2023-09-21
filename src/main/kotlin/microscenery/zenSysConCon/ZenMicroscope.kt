@@ -13,6 +13,7 @@ import microscenery.zenSysConCon.sysCon.*
 import org.joml.Vector2i
 import org.joml.Vector3f
 import org.lwjgl.system.MemoryUtil
+import org.w3c.dom.Document
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -29,6 +30,9 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private var currentStack: Stack? = null
 
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
+
+    private val experimentBaseNameBase = "Generated"
+    private var exposure = 0
 
     init {
         MicroscenerySettings.setVector3fIfUnset(Settings.Ablation.PrecisionUM, Vector3f(1f))
@@ -94,6 +98,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         when (val hwCommand = hardwareCommandsQueue.poll(200, TimeUnit.MILLISECONDS)) {
             is HardwareCommand.DisplayStack -> displayStack(CZIFileWrapper(hwCommand.filePath))
             HardwareCommand.CaptureStack -> try {
+                buildAndUploadImagingCzExp(experimentBaseNameBase+"Imaging"+ SimpleDateFormat("yyyyMMdd-HHmmss").format(Date()))
                 zenBlue.runExperiment()
                 val file = zenBlue.getCurrentDocument()
                 hardwareCommandsQueue.add(HardwareCommand.DisplayStack(file))
@@ -113,7 +118,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private fun handleAblatePointsCommand(hwCommand: HardwareCommand.AblatePoints) {
         try {
             val stack = currentStack ?: return
-            val experimentBaseName = "GeneratedTriggered3DAblation${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}"
+            val experimentBaseName = experimentBaseNameBase+"Triggered3DAblation"+ SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())
 
             val layerThickness = (stack.to.z - stack.from.z) / stack.slicesCount
             val ablationLayers = splitPointsIntoLayers(hwCommand.points.map { it.position }, layerThickness)
@@ -130,14 +135,12 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
                 layerIndex to points
             }
 
-            buildAndUploadCzExp(indexedAblationLayers, timePerPointMS, experimentBaseName)
+            buildAndUploadAblationCzExp(indexedAblationLayers, timePerPointMS, experimentBaseName)
             buildAndStartSysConSequence(indexedAblationLayers, experimentBaseName,hwCommand.points.first().dwellTime)
 
             zenBlue.runExperiment()
 
-            // display result
-            val file = zenBlue.getCurrentDocument()
-            hardwareCommandsQueue.add(HardwareCommand.DisplayStack(file))
+            hardwareCommandsQueue.add(HardwareCommand.CaptureStack)
 
         } catch (e: IllegalStateException) {
             errorHandlingWithDebug(e)
@@ -146,7 +149,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         }
     }
 
-    private fun buildAndUploadCzExp(
+    private fun buildAndUploadAblationCzExp(
         indexedAblationLayers: List<Pair<Int, List<Vector3f>>>,
         timePerPointMS: Int,
         experimentBaseName: String
@@ -156,13 +159,38 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         // we are not using the correct path to ?abuse? importing
         // our experiments into ZenBlue as temporary
         val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
+        extractExposure(czexpFile,czDoc)
         CzexpManipulator.validate(czDoc)
+        CzexpManipulator.setExposure(czDoc,1)
         CzexpManipulator.removeExperimentFeedback(czDoc)
         CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(czDoc,
             indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS) })
         val outputPath = "$experimentBaseName.czexp"
         CzexpManipulator.writeXmlDocument(czDoc, outputPath)
         zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
+    }
+
+    private fun buildAndUploadImagingCzExp(
+        experimentBaseName: String
+    ) {
+        val czexpFile = zenBlue.saveExperimentAndGetFilePath()
+        //val experimentFolder = File(czexpFile).parent
+        // we are not using the correct path to ?abuse? importing
+        // our experiments into ZenBlue as temporary
+        val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
+        extractExposure(czexpFile,czDoc)
+        if (exposure == 0) logger.error("Exposure is 0. This means exposure could not be extracted." )
+        CzexpManipulator.setExposure(czDoc,exposure)
+        CzexpManipulator.validate(czDoc)
+        CzexpManipulator.removeExperimentFeedback(czDoc)
+        val outputPath = "$experimentBaseName.czexp"
+        CzexpManipulator.writeXmlDocument(czDoc, outputPath)
+        zenBlue.importExperimentAndSetAsActive(File(outputPath).absolutePath)
+    }
+
+    private fun extractExposure(czexpFile: String, parsedXML: Document){
+        if (czexpFile.startsWith(experimentBaseNameBase)) return
+        CzexpManipulator.getExposure(parsedXML)?.let { exposure = it }
     }
 
     private fun buildAndStartSysConSequence(

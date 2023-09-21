@@ -65,6 +65,29 @@ object CzexpManipulator {
         transformer.transform(source, result)
     }
 
+    fun setExposure(document: Document, exposure: Int): Boolean{
+        if (exposure < 0) return false
+        val exposureTime = getExposureElement(document) ?: return false
+        exposureTime.textContent = exposure.toString()
+        return true
+    }
+
+    fun getExposure(document: Document): Int?{
+        return getExposureElement(document)?.textContent?.toIntOrNull()
+    }
+
+    private fun getExposureElement(document: Document): Node? {
+        val acquisitionModeSetup = document.getElementsByTagName("AcquisitionModeSetup").item(0) ?: return null
+        val selectedCamera = acquisitionModeSetup.getChild("SelectedDetector")?.textContent ?: return null
+
+        val selectedDetector = acquisitionModeSetup.getChild("Detectors")
+            ?.childNodes?.asList()?.firstOrNull {
+                it.nodeName == "Detector" && it.attributes.getNamedItem("Id")?.textContent == selectedCamera
+            } ?: return null
+
+        return selectedDetector.getChild("ExposureTime")
+    }
+
     /**
      * validate (no tiles, no timeseries, no experiment designer activated) only one experiemnt
      */
@@ -120,20 +143,24 @@ object CzexpManipulator {
         // the root element is of type document. the first child is the first actual element.
         document.firstChild.appendChild(document.adoptNode(experimentFeedback.firstChild))
     }
+
+    private fun Node.getChild(name:String): Node?= this.childNodes.asList().firstOrNull { it.nodeName == name}
 }
 
 
 fun main() {
-    val xmlFilePath = """C:\Nextcloud\Zeiss\20230419_Test3_stack - Copy.czexp"""
+    val xmlFilePath = """C:\Nextcloud\Zeiss\Marina_EGFP_mCherry_for_cutting - Copy.czexp"""
     val outputFilePath = "output.xml"
 
     // Parse the XML document
     val document = CzexpManipulator.parseXmlDocument(xmlFilePath)
     CzexpManipulator.validate(document)
     CzexpManipulator.removeExperimentFeedback(document)
-    CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(document, listOf(1 to 200, 3 to 3000))
+//    CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(document, listOf(1 to 200, 3 to 3000))
 //    val insertBook = parseXmlDocument(xmlFilePath2)
-
+    val exposure = CzexpManipulator.getExposure(document)
+    println(exposure)
+    CzexpManipulator.setExposure(document,1)
     // Modify the XML document
 //    modifyXmlDocument2(document,insertBook.firstChild)
 
