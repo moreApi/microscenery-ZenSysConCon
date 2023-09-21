@@ -32,7 +32,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private val hardwareCommandsQueue = ArrayBlockingQueue<HardwareCommand>(5000)
 
     private val experimentBaseNameBase = "Generated"
-    private var exposure = 0
+    private var exposure = 0f
 
     init {
         MicroscenerySettings.setVector3fIfUnset(Settings.Ablation.PrecisionUM, Vector3f(1f))
@@ -161,7 +161,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
         extractExposure(czexpFile,czDoc)
         CzexpManipulator.validate(czDoc)
-        CzexpManipulator.setExposure(czDoc,1)
+        if (!CzexpManipulator.setAllExposure(czDoc,1f)) logger.warn("Could not set exposure to 1 for ablation.")
         CzexpManipulator.removeExperimentFeedback(czDoc)
         CzexpManipulator.addExperimentFeedbackAndSetWaitLayers(czDoc,
             indexedAblationLayers.map { it.first to (it.second.size * timePerPointMS) })
@@ -179,8 +179,11 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         // our experiments into ZenBlue as temporary
         val czDoc = CzexpManipulator.parseXmlDocument(czexpFile)
         extractExposure(czexpFile,czDoc)
-        if (exposure == 0) logger.error("Exposure is 0. This means exposure could not be extracted." )
-        CzexpManipulator.setExposure(czDoc,exposure)
+        if (exposure == 0f) {
+            logger.error("Exposure is 0. This means exposure could not be extracted." )
+        } else {
+            CzexpManipulator.setAllExposure(czDoc, exposure)
+        }
         CzexpManipulator.validate(czDoc)
         CzexpManipulator.removeExperimentFeedback(czDoc)
         val outputPath = "$experimentBaseName.czexp"

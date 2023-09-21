@@ -65,15 +65,21 @@ object CzexpManipulator {
         transformer.transform(source, result)
     }
 
-    fun setExposure(document: Document, exposure: Int): Boolean{
-        if (exposure < 0) return false
-        val exposureTime = getExposureElement(document) ?: return false
-        exposureTime.textContent = exposure.toString()
+    fun setAllExposure(document: Document, exposure: Float): Boolean{
+        if (exposure <= 0) return false
+        var formattedFloat = "%.2f".format(exposure)
+        while (formattedFloat.endsWith("0")) formattedFloat = formattedFloat.removeSuffix("0")
+        formattedFloat = formattedFloat.removeSuffix(".")
+
+        document.getElementsByTagName("ExposureTime").asList()
+            .forEach {
+                it.textContent = formattedFloat
+            }
         return true
     }
 
-    fun getExposure(document: Document): Int?{
-        return getExposureElement(document)?.textContent?.toIntOrNull()
+    fun getExposure(document: Document): Float?{
+        return getExposureElement(document)?.textContent?.toFloatOrNull()
     }
 
     private fun getExposureElement(document: Document): Node? {
@@ -160,7 +166,7 @@ fun main() {
 //    val insertBook = parseXmlDocument(xmlFilePath2)
     val exposure = CzexpManipulator.getExposure(document)
     println(exposure)
-    CzexpManipulator.setExposure(document,1)
+    CzexpManipulator.setAllExposure(document,1f)
     // Modify the XML document
 //    modifyXmlDocument2(document,insertBook.firstChild)
 
