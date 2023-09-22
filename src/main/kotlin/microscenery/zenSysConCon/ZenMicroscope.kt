@@ -97,9 +97,11 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
         when (val hwCommand = hardwareCommandsQueue.poll(200, TimeUnit.MILLISECONDS)) {
             is HardwareCommand.DisplayStack -> displayStack(CZIFileWrapper(hwCommand.filePath))
             HardwareCommand.CaptureStack -> try {
+                status = status.copy(state = ServerState.STACK)
                 buildAndUploadImagingCzExp(experimentBaseNameBase+"Imaging"+ SimpleDateFormat("yyyyMMdd-HHmmss").format(Date()))
                 zenBlue.runExperiment()
                 val file = zenBlue.getCurrentDocument()
+                status = status.copy(state = ServerState.MANUAL)
                 hardwareCommandsQueue.add(HardwareCommand.DisplayStack(file))
             } catch (e: IllegalStateException) {
                 e.printStackTrace()
@@ -117,6 +119,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
     private fun handleAblatePointsCommand(hwCommand: HardwareCommand.AblatePoints) {
         try {
             val stack = currentStack ?: return
+            status = status.copy(state = ServerState.ABLATION)
             val experimentBaseName = experimentBaseNameBase+"Triggered3DAblation"+ SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())
 
             val layerThickness = (stack.to.z - stack.from.z) / stack.slicesCount
@@ -138,6 +141,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             buildAndStartSysConSequence(indexedAblationLayers, experimentBaseName,hwCommand.points.first().dwellTime)
 
             zenBlue.runExperiment()
+            status = status.copy(state = ServerState.MANUAL)
 
             hardwareCommandsQueue.add(HardwareCommand.CaptureStack)
 
@@ -227,6 +231,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
 
     private fun displayStack(wrapper: CZIFileWrapper) {
 
+        status = status.copy(state = ServerState.LIVE)
         val meta = wrapper.metadata
 
         val hwDmMin = meta.firstPlanePosUM.copy().apply { z *= 0.9995f }
@@ -273,7 +278,7 @@ class ZenMicroscope(private val zenBlue: ZenBlueTCPConnector = ZenBlueTCPConnect
             )
             output.put(sliceSignal)
         }
-
+        status = status.copy(state = ServerState.MANUAL)
     }
 
     private sealed class HardwareCommand {
